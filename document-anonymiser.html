@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Document Anonymiser</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:#0A0C10; --bg2:#111318; --bg3:#181C24; --bg4:#1E2330;
+      --text:#E8EDF5; --text2:#A0AABF; --text3:#5A6478;
+      --border:#1E2535; --border2:#2A3245;
+      --accent:#7C6FD4; --accent-dim:rgba(124,111,212,0.08); --accent2:#9D93E8;
+      --green:#00C896; --green-dim:rgba(0,200,150,0.08);
+      --yellow:#F5C842; --yellow-dim:rgba(245,200,66,0.12);
+      --grey-dim:rgba(255,255,255,0.06);
+      --red:#E05555; --red-dim:rgba(224,85,85,0.1);
+      --font:'DM Sans',sans-serif; --mono:'DM Mono',monospace;
+      --r-md:8px; --r-lg:12px; --r-xl:16px;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--text);overflow-x:hidden;}
+
+    /* NAV */
+    nav{position:sticky;top:0;z-index:100;background:rgba(10,12,16,0.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:10px 32px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+    .nav-logo{display:flex;align-items:center;gap:8px;}
+    .nav-logo-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);}
+    .nav-logo-name{font-size:13px;font-weight:600;color:var(--text);}
+    .nav-links{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+    .nav-link{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;padding:5px 12px;border-radius:20px;text-decoration:none;transition:opacity .15s;border:.5px solid transparent;}
+    .nav-link:hover{opacity:.8;}
+    .nav-link.di{background:#1A2E1A;color:#5DBF7A;border-color:#2A4A2A;}
+    .nav-link.ra{background:#1A2E52;color:#7AAAE8;border-color:#2A4F8A;}
+    .nav-link.da{background:#1C2A40;color:#4A8FE8;border-color:#2A3F60;}
+
+    /* MAIN LAYOUT */
+    .page{max-width:1100px;margin:0 auto;padding:32px 24px 60px;}
+
+    /* HERO */
+    .hero{text-align:center;padding:40px 20px 32px;margin-bottom:32px;}
+    .hero-eyebrow{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);background:var(--accent-dim);padding:4px 12px;border-radius:20px;border:.5px solid rgba(124,111,212,0.3);margin-bottom:16px;}
+    .hero h1{font-size:clamp(24px,4vw,38px);font-weight:700;line-height:1.15;margin-bottom:10px;letter-spacing:-.02em;}
+    .hero h1 em{font-style:normal;color:var(--accent2);}
+    .hero p{font-size:14px;color:var(--text2);max-width:520px;margin:0 auto;line-height:1.65;}
+    .hero-badges{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:16px;}
+    .hero-badge{font-size:10px;padding:4px 10px;border-radius:10px;background:var(--bg3);border:.5px solid var(--border2);color:var(--text3);}
+
+    /* UPLOAD ZONE */
+    .upload-zone{border:1.5px dashed rgba(124,111,212,0.3);border-radius:var(--r-xl);padding:36px 24px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg2);margin-bottom:24px;}
+    .upload-zone:hover,.upload-zone.drag-over{border-color:var(--accent);background:var(--accent-dim);}
+    .upload-zone.has-file{border-style:solid;border-color:rgba(124,111,212,0.5);background:var(--accent-dim);}
+    .upload-icon{font-size:32px;margin-bottom:10px;}
+    .upload-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:4px;}
+    .upload-sub{font-size:12px;color:var(--text3);line-height:1.5;}
+    .upload-privacy{display:inline-flex;align-items:center;gap:5px;font-size:10px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:10px;border:.5px solid rgba(124,111,212,0.3);margin-top:10px;}
+
+    /* PROGRESS BAR */
+    .progress-bar{height:3px;background:var(--border);border-radius:2px;margin-bottom:24px;overflow:hidden;display:none;}
+    .progress-bar.visible{display:block;}
+    .progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));width:0%;transition:width .3s;}
+
+    /* MAIN PANEL */
+    .main-panel{display:none;gap:20px;}
+    .main-panel.visible{display:grid;grid-template-columns:1fr 280px;}
+    @media(max-width:800px){.main-panel.visible{grid-template-columns:1fr;}}
+
+    /* TEXT VIEWER */
+    .text-viewer{background:var(--bg2);border:.5px solid var(--border2);border-radius:var(--r-xl);overflow:hidden;}
+    .viewer-header{padding:14px 18px;border-bottom:.5px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+    .viewer-title{font-size:12px;font-weight:600;color:var(--text2);display:flex;align-items:center;gap:6px;}
+    .viewer-actions{display:flex;gap:6px;}
+    .viewer-btn{padding:5px 12px;border-radius:6px;border:.5px solid var(--border2);background:none;font-size:10.5px;font-weight:500;color:var(--text3);cursor:pointer;font-family:var(--font);transition:all .13s;}
+    .viewer-btn:hover{border-color:var(--accent);color:var(--accent);}
+    .viewer-btn.green{border-color:rgba(0,200,150,0.3);color:var(--green);}
+    .viewer-btn.green:hover{background:var(--green-dim);}
+
+    /* MANUAL ADD */
+    .manual-add{display:flex;gap:6px;padding:10px 18px;border-bottom:.5px solid var(--border);background:var(--bg3);}
+    .manual-input{flex:1;background:var(--bg);border:.5px solid var(--border2);border-radius:6px;padding:6px 10px;font-family:var(--mono);font-size:11px;color:var(--text);outline:none;transition:border-color .15s;}
+    .manual-input:focus{border-color:var(--accent);}
+    .manual-input::placeholder{color:var(--text3);}
+    .manual-add-btn{padding:6px 12px;border-radius:6px;background:var(--accent-dim);border:.5px solid rgba(124,111,212,0.3);color:var(--accent);font-size:11px;font-weight:500;cursor:pointer;font-family:var(--font);transition:all .13s;white-space:nowrap;}
+    .manual-add-btn:hover{background:rgba(124,111,212,0.15);}
+
+    /* TEXT CONTENT */
+    .text-content{padding:20px;font-family:var(--mono);font-size:12px;line-height:1.9;color:var(--text2);max-height:520px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;}
+    .text-content::-webkit-scrollbar{width:4px;}
+    .text-content::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+
+    /* WORD CHIPS */
+    .word-chip{border-radius:3px;padding:1px 3px;cursor:pointer;transition:all .13s;user-select:none;display:inline;}
+    .word-chip.pending{background:rgba(245,200,66,0.15);color:var(--yellow);border-bottom:1.5px solid var(--yellow);text-decoration:none;}
+    .word-chip.anon{background:rgba(0,200,150,0.15);color:var(--green);border-bottom:1.5px solid var(--green);text-decoration:line-through;text-decoration-color:rgba(0,200,150,0.5);}
+    .word-chip.keep{background:var(--grey-dim);color:var(--text3);border-bottom:1.5px solid var(--border2);}
+    .word-chip.auto{background:rgba(124,111,212,0.12);color:var(--accent2);border-bottom:1.5px solid rgba(124,111,212,0.4);cursor:default;}
+
+    /* SIDEBAR */
+    .sidebar{display:flex;flex-direction:column;gap:12px;}
+    .sidebar-card{background:var(--bg2);border:.5px solid var(--border2);border-radius:var(--r-xl);padding:16px;}
+    .sidebar-card-title{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:12px;display:flex;align-items:center;gap:6px;}
+
+    /* STATS */
+    .stat-row{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:.5px solid var(--border);font-size:12px;}
+    .stat-row:last-child{border:none;}
+    .stat-label{color:var(--text2);display:flex;align-items:center;gap:6px;}
+    .stat-val{font-weight:600;font-family:var(--mono);font-size:13px;}
+    .stat-val.yellow{color:var(--yellow);}
+    .stat-val.green{color:var(--green);}
+    .stat-val.grey{color:var(--text3);}
+    .stat-val.purple{color:var(--accent2);}
+
+    /* WORD LIST */
+    .word-list{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px;}
+    .word-tag{font-size:10px;padding:2px 8px;border-radius:10px;font-family:var(--mono);cursor:pointer;transition:all .13s;}
+    .word-tag.pending{background:rgba(245,200,66,0.1);color:var(--yellow);border:.5px solid rgba(245,200,66,0.3);}
+    .word-tag.anon{background:rgba(0,200,150,0.1);color:var(--green);border:.5px solid rgba(0,200,150,0.3);}
+    .word-tag.keep{background:var(--grey-dim);color:var(--text3);border:.5px solid var(--border);}
+
+    /* LEGEND */
+    .legend{display:flex;flex-direction:column;gap:6px;}
+    .legend-item{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text2);}
+    .legend-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0;}
+
+    /* EXPORT */
+    .export-btn{width:100%;padding:10px;border-radius:var(--r-md);border:none;font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;transition:all .15s;margin-bottom:6px;}
+    .export-btn:last-child{margin-bottom:0;}
+    .export-btn.primary{background:var(--accent);color:#fff;}
+    .export-btn.primary:hover{opacity:.88;}
+    .export-btn.secondary{background:var(--bg3);color:var(--text2);border:.5px solid var(--border2);}
+    .export-btn.secondary:hover{border-color:var(--accent);color:var(--accent);}
+    .export-btn.ra{background:rgba(42,111,212,0.15);color:#7AAAE8;border:.5px solid rgba(42,111,212,0.3);}
+    .export-btn.ra:hover{background:rgba(42,111,212,0.25);}
+    .export-btn:disabled{opacity:.4;cursor:not-allowed;}
+
+    /* DISCLAIMER */
+    .disclaimer{background:rgba(245,200,66,0.06);border:.5px solid rgba(245,200,66,0.2);border-radius:var(--r-md);padding:10px 12px;font-size:10.5px;color:rgba(245,200,66,0.7);line-height:1.55;display:flex;gap:7px;}
+
+    /* FOOTER */
+    footer{padding:20px 32px;border-top:.5px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;background:var(--bg2);}
+    .footer-author{display:flex;align-items:center;gap:10px;}
+    .footer-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;flex-shrink:0;}
+    .footer-name{font-size:12px;font-weight:600;color:var(--text);}
+    .footer-role{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-top:1px;}
+    .footer-email{font-size:11px;color:var(--accent);text-decoration:none;}
+    .footer-meta{font-size:11px;color:var(--text3);text-align:right;}
+
+    /* TOAST */
+    .toast{position:fixed;bottom:24px;right:24px;background:var(--bg3);border:.5px solid var(--accent);border-radius:var(--r-md);padding:10px 16px;font-size:12px;color:var(--accent);z-index:999;opacity:0;transform:translateY(8px);transition:all .25s;pointer-events:none;}
+    .toast.show{opacity:1;transform:none;}
+
+    @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+    .fade-in{animation:fadeIn .3s ease forwards;}
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">
+    <div class="nav-logo-dot"></div>
+    <span class="nav-logo-name">Document Anonymiser</span>
+  </div>
+  <div class="nav-links">
+    <a href="https://demand-intelligence.fastwilll.workers.dev/preview" target="_blank" class="nav-link di">⬡ Demand Intelligence</a>
+    <a href="https://requirements-assistant.fastwilll.workers.dev" target="_blank" class="nav-link ra">🧠 Requirements Assistant</a>
+    <a href="https://demand-agent-ui.fastwilll.workers.dev" target="_blank" class="nav-link da">🤖 Demand Agent</a>
+  </div>
+</nav>
+
+<div class="page">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-eyebrow">🔒 Privacy-first document tool</div>
+    <h1>Anonymise your documents<br><em>before sharing them</em></h1>
+    <p>Upload a PDF, DOCX, or TXT file. Review every sensitive word interactively. Export a clean, anonymised version — everything happens in your browser, nothing is ever uploaded.</p>
+    <div class="hero-badges">
+      <span class="hero-badge">✓ Processed locally</span>
+      <span class="hero-badge">✓ Never uploaded</span>
+      <span class="hero-badge">✓ No server, no logs</span>
+      <span class="hero-badge">✓ PDF · DOCX · TXT</span>
+    </div>
+  </div>
+
+  <!-- UPLOAD -->
+  <input type="file" id="fileInput" accept=".pdf,.docx,.doc,.txt" style="display:none" onchange="handleFile(event)">
+  <div class="upload-zone" id="uploadZone"
+       onclick="document.getElementById('fileInput').click()"
+       ondragover="event.preventDefault();this.classList.add('drag-over')"
+       ondragleave="this.classList.remove('drag-over')"
+       ondrop="handleDrop(event)">
+    <div class="upload-icon" id="uploadIcon">📄</div>
+    <div class="upload-title" id="uploadTitle">Drop your document here or click to browse</div>
+    <div class="upload-sub" id="uploadSub">PDF, DOCX, or TXT — max 10MB</div>
+    <div class="upload-privacy">🔒 Processed entirely in your browser — never uploaded to any server</div>
+  </div>
+
+  <!-- PROGRESS -->
+  <div class="progress-bar" id="progressBar">
+    <div class="progress-fill" id="progressFill"></div>
+  </div>
+
+  <!-- MAIN PANEL -->
+  <div class="main-panel" id="mainPanel">
+
+    <!-- TEXT VIEWER -->
+    <div class="text-viewer fade-in">
+      <div class="viewer-header">
+        <div class="viewer-title">📝 <span id="docName">Document</span></div>
+        <div class="viewer-actions">
+          <button class="viewer-btn green" onclick="markAll('anon')">✓ Anonymise all</button>
+          <button class="viewer-btn" onclick="markAll('keep')">✗ Keep all</button>
+          <button class="viewer-btn" onclick="resetAll()">↺ Reset</button>
+        </div>
+      </div>
+      <div class="manual-add">
+        <input type="text" class="manual-input" id="manualInput" placeholder="Add word or phrase to anonymise..." onkeydown="if(event.key==='Enter')addManualWord()">
+        <button class="manual-add-btn" onclick="addManualWord()">+ Add</button>
+      </div>
+      <div class="text-content" id="textContent"></div>
+    </div>
+
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+
+      <!-- STATS -->
+      <div class="sidebar-card fade-in">
+        <div class="sidebar-card-title">📊 Review progress</div>
+        <div class="stat-row">
+          <span class="stat-label"><span style="color:var(--yellow)">●</span> Pending review</span>
+          <span class="stat-val yellow" id="statPending">0</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label"><span style="color:var(--green)">●</span> To anonymise</span>
+          <span class="stat-val green" id="statAnon">0</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label"><span style="color:var(--text3)">●</span> Kept as-is</span>
+          <span class="stat-val grey" id="statKeep">0</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label"><span style="color:var(--accent2)">●</span> Auto-anonymised</span>
+          <span class="stat-val purple" id="statAuto">0</span>
+        </div>
+      </div>
+
+      <!-- WORD LIST -->
+      <div class="sidebar-card fade-in">
+        <div class="sidebar-card-title">🔍 Detected words</div>
+        <div class="word-list" id="wordList"></div>
+      </div>
+
+      <!-- LEGEND -->
+      <div class="sidebar-card fade-in">
+        <div class="sidebar-card-title">💡 How to use</div>
+        <div class="legend">
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(245,200,66,0.4);border:1px solid var(--yellow);"></div><span><strong style="color:var(--yellow)">Yellow</strong> — click to decide</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(0,200,150,0.3);border:1px solid var(--green);"></div><span><strong style="color:var(--green)">Green</strong> — will be anonymised</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--grey-dim);border:1px solid var(--border2);"></div><span><strong style="color:var(--text3)">Grey</strong> — kept as-is</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(124,111,212,0.2);border:1px solid var(--accent);"></div><span><strong style="color:var(--accent2)">Purple</strong> — auto-anonymised</span></div>
+        </div>
+        <div style="margin-top:10px;font-size:10.5px;color:var(--text3);line-height:1.55;">Click any highlighted word to cycle: pending → anonymise → keep. Clicking affects <strong style="color:var(--text2)">all occurrences</strong> in the document.</div>
+      </div>
+
+      <!-- EXPORT -->
+      <div class="sidebar-card fade-in">
+        <div class="sidebar-card-title">⬇ Export</div>
+        <div class="disclaimer" style="margin-bottom:12px;">
+          <span>⚠️</span><span>Review all yellow words before exporting. Words left as pending will be included unchanged.</span>
+        </div>
+        <button class="export-btn primary" onclick="exportAnonymised()" id="btnExport">⬇ Download anonymised .txt</button>
+        <button class="export-btn secondary" onclick="copyAnonymised()" id="btnCopy">📋 Copy to clipboard</button>
+        <button class="export-btn secondary" onclick="exportMap()" id="btnMap">⬇ Download anonymisation map</button>
+        <button class="export-btn ra" onclick="sendToRA()" id="btnRA">🧠 Open in Requirements Assistant →</button>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <div class="footer-author">
+    <div class="footer-avatar">AP</div>
+    <div>
+      <div class="footer-name">Alberto Pavani</div>
+      <div class="footer-role">Senior Product &amp; Solution Delivery Engineer</div>
+      <a href="mailto:albpavani@gmail.com" class="footer-email">albpavani@gmail.com</a>
+    </div>
+  </div>
+  <div class="footer-meta">
+    <strong style="color:var(--text2);">Document Anonymiser</strong>
+    <div style="margin-top:2px;">Privacy-first · Browser-only · <span style="color:rgba(255,255,255,0.3);">v1.0.0</span></div>
+  </div>
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<!-- PDF.js -->
+<script>
+var pdfjsLoaded = false;
+function loadPdfJs(cb) {
+  if (pdfjsLoaded) { cb(); return; }
+  var s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+  s.onload = function() {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    pdfjsLoaded = true; cb();
+  };
+  document.head.appendChild(s);
+}
+
+var mammothLoaded = false;
+function loadMammoth(cb) {
+  if (mammothLoaded) { cb(); return; }
+  var s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js';
+  s.onload = function() { mammothLoaded = true; cb(); };
+  document.head.appendChild(s);
+}
+</script>
+
+<script>
+// ── STATE ─────────────────────────────────────────────
+var rawText = '';
+var wordStates = {};   // normalised word -> 'pending' | 'anon' | 'keep' | 'auto'
+var autoMap = {};      // placeholder -> original (for auto-anonymised)
+var sessionMemory = {}; // persists decisions across documents in session
+
+// ── STOPWORDS (never highlighted) ─────────────────────
+var STOPWORDS = new Set([
+  'The','A','An','This','That','These','Those','Each','Every','Any','All','Both',
+  'New','Old','High','Low','Good','Bad','Big','Small','Large','First','Last',
+  'Main','Key','Core','Full','Base','Top','End','Side','Set','Get','Use','For',
+  'And','But','Or','Not','With','From','Into','About','After','Before','During',
+  'Business','Requirements','Document','System','Service','Process','Project',
+  'Demand','Request','Category','Rank','Type','Level','Stage','Phase','Status',
+  'Internal','External','Public','Private','Global','Local','Remote','Online',
+  'Portal','Platform','Application','Interface','Dashboard','Module','Feature',
+  'Data','Report','Analysis','Review','Assessment','Design','Implementation',
+  'Management','Operations','Support','Infrastructure','Architecture','Solution',
+  'Team','Group','Department','Division','Unit','Board','Committee','Council',
+  'Access','Control','Security','Policy','Rule','Standard','Framework',
+  'User','Admin','Owner','Manager','Lead','Director','Officer','Client',
+  'Version','Release','Update','Change','Issue','Risk','Action','Item',
+  'Meeting','Session','Call','Workshop','Sprint','Epic','Story','Task',
+  'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday',
+  'January','February','March','April','May','June','July','August',
+  'September','October','November','December',
+  // Italian
+  'Il','La','Le','Lo','Gli','Una','Uno','Del','Della','Dello','Dei','Delle',
+  'Nel','Nella','Con','Per','Tra','Fra','Sul','Sulla','Sui','Alle','Alla',
+  'Nuova','Nuovo','Alta','Alto','Bassa','Basso','Prima','Primo','Ultima','Ultimo',
+  'Gestione','Sistema','Servizio','Progetto','Domanda','Richiesta','Categoria',
+  'Interna','Interno','Esterna','Esterno','Pubblica','Pubblico','Privata','Privato',
+  // French
+  'Le','Les','Des','Une','Dans','Sur','Avec','Pour','Par','Qui','Que',
+  'Nouveau','Nouvelle','Premier','Premiere','Grand','Grande',
+  // German
+  'Der','Die','Das','Ein','Eine','Mit','Von','Zu','Bei','Nach'
+]);
+
+var ACRONYMS = new Set([
+  'BRD','FRD','API','BSS','OSS','NFR','SLA','KPI','UAT','ROI','CRM','ERP',
+  'HTTP','HTTPS','REST','JSON','XML','SQL','PDF','DOCX','TXT','CSV','JWT',
+  'SSO','MFA','GDPR','DPIA','VPN','DNS','IP','UI','UX','PM','IT','HR',
+  'CEO','CFO','CTO','COO','VP','GM','POC','RFP','RFQ','SoW','ToR',
+  'NMS','GEO','LEO','MEO','MHz','GHz','VSAT','NOC','SOP','OKR'
+]);
+
+var AUTO_PATTERNS = [
+  { re: /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g, prefix: 'EMAIL' },
+  { re: /https?:\/\/[^\s"'<>]+/g, prefix: 'URL' },
+  { re: /\b(?:\d{1,3}\.){3}\d{1,3}\b/g, prefix: 'IP' }
+];
+
+// ── FILE HANDLING ─────────────────────────────────────
+function handleFile(e) {
+  var file = e.target.files[0];
+  if (file) processFile(file);
+}
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('uploadZone').classList.remove('drag-over');
+  var file = e.dataTransfer.files[0];
+  if (file) processFile(file);
+}
+
+function processFile(file) {
+  if (file.size > 10 * 1024 * 1024) { showToast('⚠️ File too large (max 10MB)'); return; }
+  setProgress(10);
+  document.getElementById('uploadTitle').textContent = 'Reading ' + file.name + '...';
+  document.getElementById('uploadZone').classList.add('has-file');
+  document.getElementById('docName').textContent = file.name;
+
+  if (file.name.match(/\.pdf$/i)) {
+    loadPdfJs(function() { extractPdf(file); });
+  } else if (file.name.match(/\.docx?$/i)) {
+    loadMammoth(function() { extractDocx(file); });
+  } else {
+    var r = new FileReader();
+    r.onload = function(e) { onTextReady(e.target.result, file.name); };
+    r.readAsText(file);
+  }
+}
+
+function extractPdf(file) {
+  var r = new FileReader();
+  r.onload = function(e) {
+    pdfjsLib.getDocument({ data: new Uint8Array(e.target.result) }).promise.then(function(pdf) {
+      var pages = [], done = 0, total = pdf.numPages;
+      setProgress(30);
+      for (var i = 1; i <= total; i++) {
+        (function(n) {
+          pdf.getPage(n).then(function(p) {
+            p.getTextContent().then(function(tc) {
+              pages[n-1] = tc.items.map(function(s){return s.str;}).join(' ');
+              done++;
+              setProgress(30 + Math.round((done/total)*40));
+              if (done === total) onTextReady(pages.join('\n\n'), file.name);
+            });
+          });
+        })(i);
+      }
+    }).catch(function(err){ showToast('⚠️ PDF error: ' + err.message); resetProgress(); });
+  };
+  r.readAsArrayBuffer(file);
+}
+
+function extractDocx(file) {
+  var r = new FileReader();
+  r.onload = function(e) {
+    setProgress(40);
+    mammoth.extractRawText({ arrayBuffer: e.target.result })
+      .then(function(res){ onTextReady(res.value, file.name); })
+      .catch(function(err){ showToast('⚠️ DOCX error: ' + err.message); resetProgress(); });
+  };
+  r.readAsArrayBuffer(file);
+}
+
+// ── TEXT PROCESSING ───────────────────────────────────
+function onTextReady(text, filename) {
+  rawText = text;
+  setProgress(70);
+  wordStates = {};
+  autoMap = {};
+
+  // Apply auto-anonymisation
+  var processedText = text;
+  var autoCount = 0;
+  AUTO_PATTERNS.forEach(function(p) {
+    var counter = 0;
+    processedText = processedText.replace(p.re, function(match) {
+      counter++;
+      var placeholder = '[' + p.prefix + '_' + counter + ']';
+      autoMap[placeholder] = match;
+      autoCount++;
+      return placeholder;
+    });
+  });
+
+  // Detect candidate words/phrases for review
+  detectCandidates(processedText);
+
+  setProgress(90);
+  renderText(processedText);
+  updateStats();
+  renderWordList();
+
+  document.getElementById('uploadTitle').textContent = '✓ ' + filename + ' — ' + Math.round(text.length/1000) + 'k chars';
+  document.getElementById('uploadSub').textContent = Object.keys(wordStates).length + ' words detected for review · ' + autoCount + ' auto-anonymised';
+  document.getElementById('mainPanel').classList.add('visible');
+
+  setProgress(100);
+  setTimeout(function(){ resetProgress(); }, 600);
+}
+
+function detectCandidates(text) {
+  // Split into sentences to know which words are at sentence start
+  var sentences = text.split(/(?<=[.!?])\s+/);
+  var sentenceStarts = new Set();
+  sentences.forEach(function(s) {
+    var firstWord = s.trim().split(/\s+/)[0];
+    sentenceStarts.add(firstWord);
+  });
+
+  // Find capitalised words/phrases not at sentence start
+  // Pattern: one or more consecutive Capitalised words
+  var re = /(?<![A-Za-z\[])([A-Z][a-zA-Z]{2,}(?:\s[A-Z][a-zA-Z]{1,}){0,3})(?![a-z])/g;
+  var match;
+  while ((match = re.exec(text)) !== null) {
+    var phrase = match[1].trim();
+    var words = phrase.split(/\s+/);
+
+    // Skip if first word is a sentence starter
+    if (sentenceStarts.has(words[0])) continue;
+    // Skip if all words are stopwords
+    if (words.every(function(w){ return STOPWORDS.has(w); })) continue;
+    // Skip if it's an acronym placeholder
+    if (phrase.match(/^\[.+\]$/)) continue;
+    // Skip if it's an auto-placeholder
+    if (phrase.match(/^\[(?:EMAIL|URL|IP)_\d+\]$/)) continue;
+    // Skip if all-caps acronym
+    if (ACRONYMS.has(phrase)) continue;
+    // Skip very short single words
+    if (words.length === 1 && phrase.length <= 3) continue;
+
+    var key = phrase.toLowerCase();
+    if (!(key in wordStates)) {
+      // Check session memory
+      wordStates[key] = sessionMemory[key] || 'pending';
+    }
+  }
+}
+
+// ── RENDER ────────────────────────────────────────────
+function renderText(text) {
+  var container = document.getElementById('textContent');
+  if (Object.keys(wordStates).length === 0) {
+    container.textContent = text;
+    return;
+  }
+
+  // Build a combined regex for all candidate words + auto placeholders
+  var allPatterns = [];
+
+  // Auto placeholders
+  Object.keys(autoMap).forEach(function(p) {
+    allPatterns.push(p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  });
+
+  // Candidate words (longest first to avoid partial matches)
+  var candidates = Object.keys(wordStates).sort(function(a,b){ return b.length - a.length; });
+  candidates.forEach(function(key) {
+    // Escape for regex and make case-insensitive match
+    allPatterns.push('(?<![A-Za-z\\[])' + key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![a-z\\]])');
+  });
+
+  if (allPatterns.length === 0) { container.textContent = text; return; }
+
+  var combinedRe = new RegExp('(' + allPatterns.join('|') + ')', 'gi');
+  var parts = text.split(combinedRe);
+  var html = '';
+
+  parts.forEach(function(part) {
+    if (!part) return;
+    var key = part.toLowerCase();
+
+    // Auto placeholder
+    if (autoMap[part]) {
+      html += '<span class="word-chip auto" title="Auto-anonymised: ' + autoMap[part] + '">' + part + '</span>';
+      return;
+    }
+
+    // Candidate word
+    if (wordStates.hasOwnProperty(key)) {
+      var state = wordStates[key];
+      html += '<span class="word-chip ' + state + '" onclick="toggleWord(\'' + key.replace(/'/g,"&#39;") + '\')" title="Click to change">' + part + '</span>';
+      return;
+    }
+
+    // Plain text — escape HTML
+    html += part.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  });
+
+  container.innerHTML = html;
+}
+
+// ── INTERACTIONS ──────────────────────────────────────
+function toggleWord(key) {
+  var current = wordStates[key] || 'pending';
+  var next = current === 'pending' ? 'anon' : current === 'anon' ? 'keep' : 'pending';
+  wordStates[key] = next;
+  sessionMemory[key] = next;
+
+  // Update all chips with this key
+  document.querySelectorAll('.word-chip[onclick]').forEach(function(chip) {
+    var chipKey = chip.getAttribute('onclick').match(/toggleWord\('(.+?)'\)/);
+    if (chipKey && chipKey[1] === key) {
+      chip.className = 'word-chip ' + next;
+    }
+  });
+
+  updateStats();
+  renderWordList();
+}
+
+function markAll(state) {
+  Object.keys(wordStates).forEach(function(key) {
+    if (wordStates[key] !== 'auto') {
+      wordStates[key] = state;
+      sessionMemory[key] = state;
+    }
+  });
+  // Re-render
+  var processedText = applyAutoMap(rawText);
+  renderText(processedText);
+  updateStats();
+  renderWordList();
+}
+
+function resetAll() {
+  Object.keys(wordStates).forEach(function(key) {
+    if (wordStates[key] !== 'auto') wordStates[key] = 'pending';
+  });
+  var processedText = applyAutoMap(rawText);
+  renderText(processedText);
+  updateStats();
+  renderWordList();
+}
+
+function applyAutoMap(text) {
+  var result = text;
+  AUTO_PATTERNS.forEach(function(p) {
+    var counter = 0;
+    result = result.replace(p.re, function(match) {
+      counter++;
+      return '[' + p.prefix + '_' + counter + ']';
+    });
+  });
+  return result;
+}
+
+function addManualWord() {
+  var input = document.getElementById('manualInput');
+  var word = input.value.trim();
+  if (!word) return;
+  var key = word.toLowerCase();
+  wordStates[key] = 'anon';
+  sessionMemory[key] = 'anon';
+  input.value = '';
+  var processedText = applyAutoMap(rawText);
+  renderText(processedText);
+  updateStats();
+  renderWordList();
+  showToast('✓ "' + word + '" added');
+}
+
+// ── STATS & WORD LIST ─────────────────────────────────
+function updateStats() {
+  var counts = { pending:0, anon:0, keep:0, auto:0 };
+  Object.values(wordStates).forEach(function(s){ counts[s] = (counts[s]||0) + 1; });
+  counts.auto = Object.keys(autoMap).length;
+  document.getElementById('statPending').textContent = counts.pending;
+  document.getElementById('statAnon').textContent = counts.anon;
+  document.getElementById('statKeep').textContent = counts.keep;
+  document.getElementById('statAuto').textContent = counts.auto;
+}
+
+function renderWordList() {
+  var container = document.getElementById('wordList');
+  var html = '';
+  Object.keys(wordStates).sort().forEach(function(key) {
+    var state = wordStates[key];
+    html += '<span class="word-tag ' + state + '" onclick="toggleWord(\'' + key.replace(/'/g,"&#39;") + '\')" title="Click to toggle">' + key + '</span>';
+  });
+  container.innerHTML = html || '<span style="font-size:11px;color:var(--text3);">No candidates detected</span>';
+}
+
+// ── BUILD ANONYMISED TEXT ─────────────────────────────
+function buildAnonymisedText() {
+  var text = rawText;
+  var counters = {};
+
+  // Apply auto patterns first
+  AUTO_PATTERNS.forEach(function(p) {
+    var counter = 0;
+    text = text.replace(p.re, function(match) {
+      counter++;
+      return '[' + p.prefix + '_' + counter + ']';
+    });
+  });
+
+  // Apply user decisions (anon only, longest first)
+  var toAnon = Object.keys(wordStates)
+    .filter(function(k){ return wordStates[k] === 'anon'; })
+    .sort(function(a,b){ return b.length - a.length; });
+
+  var anonMap = {};
+  var globalCounter = 0;
+  toAnon.forEach(function(key) {
+    globalCounter++;
+    var placeholder = '[ANON_' + globalCounter + ']';
+    anonMap[placeholder] = key;
+    var re = new RegExp('(?<![A-Za-z\\[])' + key.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '(?![a-z\\]])', 'gi');
+    text = text.replace(re, placeholder);
+  });
+
+  return { text: text, anonMap: anonMap };
+}
+
+// ── EXPORT ────────────────────────────────────────────
+function exportAnonymised() {
+  var result = buildAnonymisedText();
+  var blob = new Blob([result.text], { type: 'text/plain;charset=utf-8' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'anonymised-document.txt';
+  a.click();
+  showToast('✓ Anonymised document downloaded');
+}
+
+function copyAnonymised() {
+  var result = buildAnonymisedText();
+  navigator.clipboard.writeText(result.text).then(function(){
+    showToast('✓ Copied to clipboard');
+  });
+}
+
+function exportMap() {
+  var result = buildAnonymisedText();
+  var fullMap = Object.assign({}, autoMap, result.anonMap);
+  if (Object.keys(fullMap).length === 0) { showToast('⚠️ No anonymisations to export'); return; }
+  var blob = new Blob([JSON.stringify(fullMap, null, 2)], { type: 'application/json' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'anonymisation-map.json';
+  a.click();
+  showToast('✓ Anonymisation map downloaded');
+}
+
+function sendToRA() {
+  var result = buildAnonymisedText();
+  try {
+    sessionStorage.setItem('anon_doc_text', result.text);
+    sessionStorage.setItem('anon_doc_ready', 'true');
+    window.open('https://requirements-assistant.fastwilll.workers.dev', '_blank');
+    showToast('✓ Text ready — open Requirements Assistant');
+  } catch(e) {
+    showToast('⚠️ Could not pass text — copy manually');
+  }
+}
+
+// ── UTILS ─────────────────────────────────────────────
+function setProgress(pct) {
+  document.getElementById('progressBar').classList.add('visible');
+  document.getElementById('progressFill').style.width = pct + '%';
+}
+function resetProgress() {
+  document.getElementById('progressBar').classList.remove('visible');
+  document.getElementById('progressFill').style.width = '0%';
+}
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); }, 2500);
+}
+</script>
+
+</body>
+</html>
