@@ -149,6 +149,23 @@
     .toast.show{opacity:1;transform:none;}
 
     @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+    /* REPLACEMENT EDITOR */
+    .replace-card{background:var(--bg2);border:.5px solid rgba(124,111,212,0.4);border-radius:var(--r-xl);padding:16px;display:none;}
+    .replace-card.visible{display:block;animation:fadeIn .2s ease;}
+    .replace-word{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--yellow);margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+    .replace-input{width:100%;background:var(--bg);border:.5px solid var(--border2);border-radius:6px;padding:8px 10px;font-family:var(--mono);font-size:12px;color:var(--text);outline:none;transition:border-color .15s;margin-bottom:8px;}
+    .replace-input:focus{border-color:var(--accent);}
+    .replace-input::placeholder{color:var(--text3);}
+    .replace-actions{display:flex;gap:6px;}
+    .replace-btn{flex:1;padding:7px;border-radius:6px;border:none;font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font);transition:all .13s;}
+    .replace-btn.confirm{background:var(--green);color:#000;}
+    .replace-btn.confirm:hover{opacity:.88;}
+    .replace-btn.placeholder{background:var(--accent-dim);color:var(--accent);border:.5px solid rgba(124,111,212,0.3);}
+    .replace-btn.placeholder:hover{background:rgba(124,111,212,0.2);}
+    .replace-btn.skip{background:var(--grey-dim);color:var(--text3);border:.5px solid var(--border);}
+    .replace-btn.skip:hover{color:var(--text);}
+    .replace-hint{font-size:10px;color:var(--text3);margin-top:8px;line-height:1.5;}
     .fade-in{animation:fadeIn .3s ease forwards;}
   </style>
 </head>
@@ -243,6 +260,19 @@
         </div>
       </div>
 
+      <!-- REPLACEMENT EDITOR -->
+      <div class="replace-card" id="replaceCard">
+        <div class="sidebar-card-title" style="margin-bottom:8px;">✏️ Set replacement</div>
+        <div class="replace-word" id="replaceWordLabel">—</div>
+        <input type="text" class="replace-input" id="replaceInput" placeholder="Type replacement (e.g. Cliente)" onkeydown="if(event.key==='Enter')confirmReplace()">
+        <div class="replace-actions">
+          <button class="replace-btn confirm" onclick="confirmReplace()">✓ Confirm</button>
+          <button class="replace-btn placeholder" onclick="usePlaceholder()">[ ] Placeholder</button>
+          <button class="replace-btn skip" onclick="skipReplace()">✗ Skip</button>
+        </div>
+        <div class="replace-hint">Replacement applies to <strong style="color:var(--text2)">all occurrences</strong> in the document.</div>
+      </div>
+
       <!-- WORD LIST -->
       <div class="sidebar-card fade-in">
         <div class="sidebar-card-title">🔍 Detected words</div>
@@ -289,7 +319,7 @@
   </div>
   <div class="footer-meta">
     <strong style="color:var(--text2);">Document Anonymiser</strong>
-    <div style="margin-top:2px;">Privacy-first · Browser-only · <span style="color:rgba(255,255,255,0.3);">v1.0.0</span></div>
+    <div style="margin-top:2px;">Privacy-first · Browser-only · <span style="color:rgba(255,255,255,0.3);">v1.0.1</span></div>
   </div>
 </footer>
 
@@ -322,9 +352,12 @@ function loadMammoth(cb) {
 <script>
 // ── STATE ─────────────────────────────────────────────
 var rawText = '';
-var wordStates = {};   // normalised word -> 'pending' | 'anon' | 'keep' | 'auto'
-var autoMap = {};      // placeholder -> original (for auto-anonymised)
-var sessionMemory = {}; // persists decisions across documents in session
+var wordStates = {};      // normalised word -> 'pending' | 'anon' | 'keep' | 'auto'
+var wordReplacements = {}; // normalised word -> custom replacement string
+var autoMap = {};          // placeholder -> original (for auto-anonymised)
+var sessionMemory = {};    // persists decisions across documents in session
+var selectedWord = null;   // word currently being edited in sidebar
+var anonCounters = {};     // per-word anon counter for placeholder generation
 
 // ── STOPWORDS (never highlighted) ─────────────────────
 var STOPWORDS = new Set([
@@ -568,27 +601,87 @@ function renderText(text) {
 // ── INTERACTIONS ──────────────────────────────────────
 function toggleWord(key) {
   var current = wordStates[key] || 'pending';
-  var next = current === 'pending' ? 'anon' : current === 'anon' ? 'keep' : 'pending';
-  wordStates[key] = next;
-  sessionMemory[key] = next;
 
-  // Update all chips with this key
+  // If pending → open sidebar editor
+  if (current === 'pending') {
+    openReplaceEditor(key);
+    return;
+  }
+
+  // If anon or keep → cycle without editor
+  var next = current === 'anon' ? 'keep' : 'pending';
+  setWordState(key, next);
+}
+
+function setWordState(key, state, replacement) {
+  wordStates[key] = state;
+  sessionMemory[key] = state;
+  if (replacement !== undefined) {
+    wordReplacements[key] = replacement;
+  } else if (state !== 'anon') {
+    delete wordReplacements[key];
+  }
+
   document.querySelectorAll('.word-chip[onclick]').forEach(function(chip) {
-    var chipKey = chip.getAttribute('onclick').match(/toggleWord\('(.+?)'\)/);
-    if (chipKey && chipKey[1] === key) {
-      chip.className = 'word-chip ' + next;
-    }
+    var m = chip.getAttribute('onclick').match(/toggleWord\('(.+?)'\)/);
+    if (m && m[1] === key) chip.className = 'word-chip ' + state;
   });
 
   updateStats();
   renderWordList();
+  // Close editor if this word was being edited
+  if (selectedWord === key && state !== 'anon') closeReplaceEditor();
+}
+
+function openReplaceEditor(key) {
+  selectedWord = key;
+  var card = document.getElementById('replaceCard');
+  var label = document.getElementById('replaceWordLabel');
+  var input = document.getElementById('replaceInput');
+  label.textContent = '"' + key + '"';
+  input.value = wordReplacements[key] || '';
+  input.placeholder = 'e.g. Cliente, Fornitore, Azienda...';
+  card.classList.add('visible');
+  // Scroll sidebar to top to show editor
+  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  setTimeout(function(){ input.focus(); }, 200);
+}
+
+function closeReplaceEditor() {
+  selectedWord = null;
+  document.getElementById('replaceCard').classList.remove('visible');
+  document.getElementById('replaceInput').value = '';
+}
+
+function confirmReplace() {
+  if (!selectedWord) return;
+  var input = document.getElementById('replaceInput').value.trim();
+  var replacement = input || null;
+  setWordState(selectedWord, 'anon', replacement);
+  closeReplaceEditor();
+  showToast(input ? '✓ Will replace with "' + input + '"' : '✓ Will use placeholder');
+}
+
+function usePlaceholder() {
+  if (!selectedWord) return;
+  setWordState(selectedWord, 'anon', null);
+  closeReplaceEditor();
+  showToast('✓ Will use [ANON_N] placeholder');
+}
+
+function skipReplace() {
+  if (!selectedWord) return;
+  setWordState(selectedWord, 'keep');
+  closeReplaceEditor();
 }
 
 function markAll(state) {
+  closeReplaceEditor();
   Object.keys(wordStates).forEach(function(key) {
     if (wordStates[key] !== 'auto') {
       wordStates[key] = state;
       sessionMemory[key] = state;
+      if (state !== 'anon') delete wordReplacements[key];
     }
   });
   // Re-render
@@ -651,7 +744,8 @@ function renderWordList() {
   var html = '';
   Object.keys(wordStates).sort().forEach(function(key) {
     var state = wordStates[key];
-    html += '<span class="word-tag ' + state + '" onclick="toggleWord(\'' + key.replace(/'/g,"&#39;") + '\')" title="Click to toggle">' + key + '</span>';
+    var repl = wordReplacements[key] ? ' → ' + wordReplacements[key] : '';
+    html += '<span class="word-tag ' + state + '" onclick="toggleWord(\'' + key.replace(/'/g,"&#39;") + '\')" title="Click to toggle">' + key + repl + '</span>';
   });
   container.innerHTML = html || '<span style="font-size:11px;color:var(--text3);">No candidates detected</span>';
 }
@@ -678,11 +772,18 @@ function buildAnonymisedText() {
   var anonMap = {};
   var globalCounter = 0;
   toAnon.forEach(function(key) {
-    globalCounter++;
-    var placeholder = '[ANON_' + globalCounter + ']';
-    anonMap[placeholder] = key;
+    var customReplacement = wordReplacements[key];
+    var replacement;
+    if (customReplacement) {
+      replacement = customReplacement;
+      anonMap[customReplacement] = key;
+    } else {
+      globalCounter++;
+      replacement = '[ANON_' + globalCounter + ']';
+      anonMap[replacement] = key;
+    }
     var re = new RegExp('(?<![A-Za-z\\[])' + key.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '(?![a-z\\]])', 'gi');
-    text = text.replace(re, placeholder);
+    text = text.replace(re, replacement);
   });
 
   return { text: text, anonMap: anonMap };
