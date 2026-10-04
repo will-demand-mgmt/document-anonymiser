@@ -4,15 +4,6 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Document Anonymiser</title>
-  <script>
-(function(){
-  var AUTH_KEY = 'anon_auth';
-  if (sessionStorage.getItem(AUTH_KEY) !== 'true') {
-    var next = encodeURIComponent(window.location.pathname + window.location.search);
-    window.location.replace('/login?next=' + next);
-  }
-})();
-</script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -328,8 +319,8 @@
   </div>
   <div class="footer-meta">
     <strong style="color:var(--text2);">Document Anonymiser</strong>
-    <div style="margin-top:2px;">Privacy-first · Browser-only · <span style="color:rgba(255,255,255,0.3);">v1.0.1</span> &nbsp;·&nbsp;
-      <a href="/login" onclick="sessionStorage.removeItem('anon_auth')" style="color:rgba(255,255,255,0.3);text-decoration:none;transition:color .13s;" onmouseover="this.style.color='#E05555'" onmouseout="this.style.color='rgba(255,255,255,0.3)'">Sign out</a>
+    <div style="margin-top:2px;">Privacy-first · Browser-only · <span style="color:rgba(255,255,255,0.3);">v1.1.0</span> &nbsp;·&nbsp;
+      <a href="/cdn-cgi/access/logout" style="color:rgba(255,255,255,0.3);text-decoration:none;transition:color .13s;" onmouseover="this.style.color='#E05555'" onmouseout="this.style.color='rgba(255,255,255,0.3)'">Sign out</a>
     </div>
   </div>
 </footer>
